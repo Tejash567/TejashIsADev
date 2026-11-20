@@ -38,7 +38,7 @@ header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:va
 .logo i:empty{display:none}
 .logo:hover i{transform:rotate(-12deg) scale(1.08)}
 .logo i img{width:100%;height:100%;object-fit:contain}
-.cur #lg::after{content:"_";color:var(--acc);margin-left:2px;animation:bl 1.1s steps(2) infinite}
+.cur #lg::after{content:"";display:inline-block;width:14px;height:3px;border-radius:2px;background:var(--acc);margin-left:4px;animation:bl 1.1s steps(2) infinite}
 @keyframes bl{50%{opacity:0}}
 nav{display:flex;align-items:center;gap:4px}
 nav a{padding:8px 12px;border-radius:8px;font-size:14px;color:var(--mute);transition:background .2s,color .2s}
@@ -197,12 +197,41 @@ footer .wrap{display:flex;justify-content:space-between}
 </main>
 <footer><div class="wrap"><span id="ft"></span><a href="#admin">Admin</a></div></footer>
 <div class="ov" id="lo"><form class="box" id="lf"><div class="eyebrow">Admin</div><h2 style="margin:0">Sign in</h2>
-  <input id="pw" type="password" placeholder="Password" autocomplete="current-password"><div class="msg" id="lm"></div>
+  <input id="em" type="email" placeholder="Email" autocomplete="username" style="display:none"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><div class="msg" id="lm"></div>
   <div class="row"><button class="btn p sm" type="submit">Sign in</button><button class="btn sm" type="button" data-close>Cancel</button></div></form></div>
 <div class="ov" id="ae"><div id="eb2"></div></div>
 
 <script>
 var KEY="portfolio2:data",PK="portfolio2:pw",SK="portfolio:theme";
+/* ---- Supabase (publishable key is safe in the browser; Row Level Security protects the data) ---- */
+var SB_URL="https://lqqhgcwzekhfzekovzjf.supabase.co",SB_KEY="sb_publishable_w1zY1gHZZGX0VSakQqPJCQ_qhyuoGVo";
+var CLOUD=!!(SB_URL&&SB_KEY),SBS=null,MSG=null;
+function sbLoadSess(){try{SBS=JSON.parse(localStorage.getItem("sb:sess")||"null")}catch(e){SBS=null}}
+function sbSaveSess(){try{if(SBS)localStorage.setItem("sb:sess",JSON.stringify(SBS));else localStorage.removeItem("sb:sess")}catch(e){}}
+function sbH(auth){var h={apikey:SB_KEY,"Content-Type":"application/json"};if(auth&&SBS)h.Authorization="Bearer "+SBS.access_token;return h}
+function sbSet(j){SBS={access_token:j.access_token,refresh_token:j.refresh_token,exp:Math.floor(Date.now()/1000)+(j.expires_in||3600),email:(j.user&&j.user.email)||""};sbSaveSess()}
+function sbTok(){if(!SBS)return Promise.resolve(false);if(SBS.exp>Date.now()/1000+60)return Promise.resolve(true);
+  return fetch(SB_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:SBS.refresh_token})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(j){sbSet(j);return true}).catch(function(){SBS=null;sbSaveSess();return false})}
+function sbLogin(em,pw){return fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{apikey:SB_KEY,"Content-Type":"application/json"},body:JSON.stringify({email:em,password:pw})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(sbSet)}
+function sbPush(){return sbTok().then(function(ok){if(!ok)throw 0;return fetch(SB_URL+"/rest/v1/site?on_conflict=id",{method:"POST",headers:Object.assign(sbH(true),{Prefer:"resolution=merge-duplicates,return=minimal"}),body:JSON.stringify({id:1,data:D,updated_at:new Date().toISOString()})})}).then(function(r){if(!r.ok)throw 0})}
+function sbGet(){return fetch(SB_URL+"/rest/v1/site?id=eq.1&select=data",{headers:sbH(false)}).then(function(r){return r.ok?r.json():[]}).then(function(a){return a[0]&&a[0].data})}
+function up(u,name,cb){if(!(CLOUD&&SBS)){cb(u);return}
+  sbTok().then(function(ok){if(!ok)throw 0;return typeof u==="string"?fetch(u).then(function(r){return r.blob()}):u}).then(function(b){
+    var p=Date.now()+"-"+name.replace(/[^a-zA-Z0-9._-]/g,"");
+    return fetch(SB_URL+"/storage/v1/object/portfolio/"+p,{method:"POST",headers:{apikey:SB_KEY,Authorization:"Bearer "+SBS.access_token,"Content-Type":b.type||"application/octet-stream"},body:b}).then(function(r){if(!r.ok)throw 0;cb(SB_URL+"/storage/v1/object/public/portfolio/"+p)})
+  }).catch(function(){note("Upload failed — keeping the file inline");cb(u)})}
+function loadMsgs(){sbTok().then(function(ok){if(!ok)throw 0;return fetch(SB_URL+"/rest/v1/messages?select=*&order=created_at.desc&limit=100",{headers:sbH(true)})}).then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(a){MSG=a;if(tab==="messages")buildEd()}).catch(function(){MSG=[];note("Could not load messages — sign in again");if(tab==="messages")buildEd()})}
+function delMsg(id){if(!confirm("Delete this message?"))return;sbTok().then(function(){return fetch(SB_URL+"/rest/v1/messages?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:sbH(true)})}).then(loadMsgs)}
+function msgPanel(){if(MSG===null)return '<div class="msg">Loading…</div>';if(!MSG.length)return '<div class="msg">No messages yet.</div>';
+  return MSG.map(function(m){return '<div class="sub"><div class="row" style="justify-content:space-between"><b>'+esc(m.name)+'</b><span class="msg">'+esc(new Date(m.created_at).toLocaleString())+'</span></div><a href="mailto:'+esc(m.email)+'" style="color:var(--acc)">'+esc(m.email)+'</a><div style="white-space:pre-wrap">'+esc(m.message)+'</div><div class="row"><a class="btn sm" href="mailto:'+esc(m.email)+'">Reply</a><button class="btn sm" data-dm="'+esc(m.id)+'" type="button">Delete</button></div></div>'}).join("")}
+var LAST="";
+function loadRemote(){if(!CLOUD)return;
+  fetch(SB_URL+"/rest/v1/site?id=eq.1&select=data,updated_at",{headers:sbH(false),cache:"no-store"}).then(function(r){return r.ok?r.json():[]}).then(function(a){var row=a[0];if(!row)return;LAST=row.updated_at;var j=row.data;if(!j||typeof j!=="object"||!Object.keys(j).length)return;
+    var nb=Object.assign({},DEF,j);if(JSON.stringify(nb)===JSON.stringify(BASE)&&JSON.stringify(D)===JSON.stringify(BASE))return;
+    BASE=nb;D=Object.assign({},BASE);if(!ld(SK))document.documentElement.setAttribute("data-theme",D.theme||"dark");render();if($("ae").classList.contains("on"))buildEd()}).catch(function(){})}
+function sync(){if(!CLOUD||pt||document.hidden)return;if(authed&&$("ae").classList.contains("on"))return;
+  fetch(SB_URL+"/rest/v1/site?id=eq.1&select=updated_at",{headers:sbH(false),cache:"no-store"}).then(function(r){return r.ok?r.json():[]}).then(function(a){if(a[0]&&a[0].updated_at!==LAST)loadRemote()}).catch(function(){})}
+if(CLOUD){setInterval(sync,3000);document.addEventListener("visibilitychange",sync)}
 function sh(a){return a.map(function(c){return{img:"",cap:c}})}
 var DEF={name:"Tejash",logo:"tejash.is.a.dev",logoFont:"",cursor:false,formUrl:"",logoImg:"",ghost:"",showGhost:true,hiOn:true,hiFont:"rozha",hi:{work:"काम",journey:"सफ़र",contact:"बात करें"},fb:"sf",fh:"sf",acc:"",theme:"dark",role:"Web Developer",tagline:"I build clean, fast web apps.",email:"you@example.com",phone:"",showPhone:false,city:"India",github:"https://github.com/Tejash567",linkedin:"",
 skills:["HTML","CSS","JavaScript","React","Node.js","Git"],
@@ -224,7 +253,7 @@ function $(i){return document.getElementById(i)}
 function safe(u){return /^(https?:|mailto:)/i.test(u)?u:"#"}
 var FONTS={sf:'-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Plus Jakarta Sans",system-ui,sans-serif',jak:'"Plus Jakarta Sans",system-ui,sans-serif',man:'Manrope,system-ui,sans-serif',bric:'"Bricolage Grotesque",system-ui,sans-serif'},HF={rozha:'"Rozha One","Noto Sans Devanagari",serif',yatra:'"Yatra One","Noto Sans Devanagari",serif',tiro:'"Tiro Devanagari Hindi","Noto Sans Devanagari",serif'};
 var lfLoaded="";
-function loadLF(){if(!D.logoFont||lfLoaded===D.logoFont)return;lfLoaded=D.logoFont;try{var f=new FontFace("LogoFont","url("+D.logoFont+")");f.load().then(function(x){document.fonts.add(x)}).catch(function(){})}catch(e){}}
+function loadLF(){if(!D.logoFont||lfLoaded===D.logoFont)return;lfLoaded=D.logoFont;try{var f=new FontFace("LogoFont","url('"+D.logoFont+"')");f.load().then(function(x){document.fonts.add(x)}).catch(function(){})}catch(e){}}
 function look(){var r=document.documentElement;
   if(/^#[0-9a-f]{6}$/i.test(D.acc||"")){var c=D.acc.slice(1),l=parseInt(c.substr(0,2),16)*.299+parseInt(c.substr(2,2),16)*.587+parseInt(c.substr(4,2),16)*.114;r.style.setProperty("--acc",D.acc);r.style.setProperty("--onacc",l>150?"#111":"#fff")}
   else{r.style.removeProperty("--acc");r.style.removeProperty("--onacc")}
@@ -290,24 +319,30 @@ function sendForm(){var f=(D.formUrl||"").trim();if(!f)return false;if($("hp").v
   b.disabled=true;b.textContent="Sending…";
   fetch(u,{method:"POST",body:fd,headers:{Accept:"application/json"}}).then(function(r){if(!r.ok)throw 0;b.textContent="Sent ✓ Thank you";$("fm").reset()}).catch(function(){b.textContent="Couldn’t send — opening email";location.href=mailto()}).then(function(){setTimeout(function(){b.disabled=false;b.textContent="Send message"},4000)});
   return true}
-$("fm").onsubmit=function(e){e.preventDefault();if(sendForm())return;location.href="mailto:"+D.email+"?subject="+encodeURIComponent("Portfolio message from "+$("fn").value)+"&body="+encodeURIComponent($("fx").value+"\n\n— "+$("fn").value+" ("+$("fe").value+")")};
+function saveMsg(){if($("hp").value)return Promise.resolve();return fetch(SB_URL+"/rest/v1/messages",{method:"POST",headers:Object.assign(sbH(false),{Prefer:"return=minimal"}),body:JSON.stringify({name:$("fn").value.slice(0,120),email:$("fe").value.slice(0,200),message:$("fx").value.slice(0,4000)})}).then(function(r){if(!r.ok)throw 0})}
+function thanks(){var b=$("fm").querySelector("button");b.textContent="Sent ✓ Thank you";$("fm").reset();setTimeout(function(){b.textContent="Send message"},4000)}
+$("fm").onsubmit=function(e){e.preventDefault();
+  if(CLOUD&&!(D.formUrl||"").trim()){saveMsg().then(thanks).catch(function(){location.href=mailto()});return}
+  if(CLOUD)saveMsg().catch(function(){});
+  if(sendForm())return;location.href="mailto:"+D.email+"?subject="+encodeURIComponent("Portfolio message from "+$("fn").value)+"&body="+encodeURIComponent($("fx").value+"\n\n— "+$("fn").value+" ("+$("fe").value+")")};
 
 /* ---------- admin ---------- */
-var authed=false,tab="profile",OP={};
+var authed=false,tab="profile",OP={};if(CLOUD){$("em").style.display="block";sbLoadSess();authed=!!SBS}
 function sha(s){try{return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)).then(function(b){return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,"0")}).join("")})}catch(e){return Promise.resolve(s)}}
 var DEFHASH=null;sha("admin123").then(function(h){DEFHASH=h});
 function route(){var a=location.hash==="#admin";$("lo").classList.toggle("on",a&&!authed);$("ae").classList.toggle("on",a&&authed);if(a&&authed)buildEd();document.body.style.overflow=a?"hidden":""}
 addEventListener("hashchange",route);
 function closeAd(){history.replaceState(null,"",location.pathname+location.search);route()}
 document.addEventListener("click",function(e){if(e.target.hasAttribute&&e.target.hasAttribute("data-close"))closeAd()});
-$("lf").onsubmit=function(e){e.preventDefault();sha($("pw").value).then(function(h){if(h===(ld(PK)||DEFHASH)){authed=true;$("pw").value="";$("lm").textContent="";route()}else $("lm").textContent="Wrong password."})};
-var TABS=[["profile","Profile"],["projects","Projects"],["journey","Journey"],["skills","Skills"],["look","Look"],["backup","Backup"]];
+$("lf").onsubmit=function(e){e.preventDefault();if(CLOUD){sbLogin($("em").value.trim(),$("pw").value).then(function(){authed=true;$("pw").value="";$("lm").textContent="";route()}).catch(function(){$("lm").textContent="Sign-in failed. Check email and password."});return}sha($("pw").value).then(function(h){if(h===(ld(PK)||DEFHASH)){authed=true;$("pw").value="";$("lm").textContent="";route()}else $("lm").textContent="Wrong password."})};
+var TABS=[["profile","Profile"],["projects","Projects"],["journey","Journey"],["skills","Skills"],["look","Look"]].concat(CLOUD?[["messages","Messages"]]:[]).concat([["backup","Backup"]]);
 function F(l,p,v,t){return '<label>'+l+'<input data-p="'+p+'" value="'+esc(v)+'"'+(t?' type="'+t+'"':'')+'></label>'}
 function sel(l,k,o){return '<label>'+l+'<select data-f="'+k+'">'+o.map(function(x){return '<option value="'+x[0]+'"'+((D[k]||o[0][0])===x[0]?" selected":"")+'>'+x[1]+'</option>'}).join("")+'</select></label>'}
 var FO=[["sf","SF Pro (Apple) / Plus Jakarta"],["jak","Plus Jakarta Sans"],["man","Manrope"],["bric","Bricolage Grotesque"]];
 function mvb(p){return '<button class="btn sm" data-mv="'+p+'|-1" type="button" title="Move up">↑</button><button class="btn sm" data-mv="'+p+'|1" type="button" title="Move down">↓</button>'}
 function lst(k,t){return '<h3>'+t+'</h3>'+D[k].map(function(x,i){return '<div class="sub"><div class="g2">'+F("Title",k+"."+i+".title",x.title)+F("Place",k+"."+i+".place",x.place)+F("Years",k+"."+i+".when",x.when)+'</div><div class="row">'+mvb(k+"."+i)+'<button class="btn sm" data-rm="'+k+"."+i+'" type="button">Remove</button></div></div>'}).join("")+'<div><button class="btn sm" data-add="'+k+'" type="button">+ Add</button></div>'}
 function panel(){
+  if(tab==="messages")return msgPanel();
   if(tab==="profile")return '<div class="g2">'+[["name","Name"],["logo","Logo text (header)"],["role","Role"],["tagline","Tagline"],["email","Email"],["phone","Phone (optional)"],["city","City only"],["github","GitHub URL"],["linkedin","LinkedIn URL"],["formUrl","Contact form endpoint (Formspree URL or Web3Forms key)"],["ghost","Hero backdrop text (blank = first name)"]].map(function(f){return F(f[1],f[0],D[f[0]])}).join("")+'</div><label class="ck"><input type="checkbox" id="sp"'+(D.showPhone?" checked":"")+'> Show phone number publicly</label><label>Logo image (optional'+(D.logoImg?", currently set":"")+')<input type="file" accept="image/*" data-logo></label>'+(D.logoImg?'<div><button class="btn sm" id="rl" type="button">Remove logo image</button></div>':'')+'<label>Logo font file (.ttf, .otf, .woff, .woff2)'+(D.logoFont?", currently set":"")+'<input type="file" accept=".ttf,.otf,.woff,.woff2" data-lf></label>'+(D.logoFont?'<div><button class="btn sm" id="rf" type="button">Remove logo font</button></div>':'')+'<label class="ck"><input type="checkbox" id="cu"'+(D.cursor?" checked":"")+'> Blinking cursor after logo text</label>';
   if(tab==="projects")return '<div class="msg">The first 3 projects are featured with swipe cards. The rest appear as small cards.</div>'+D.projects.map(function(p,i){
     return '<details class="pc" data-i="'+i+'"'+(OP[i]?" open":"")+'><summary><b>'+esc(p.name||"Untitled")+'</b><em>'+(i<3?"Featured":"More work")+'</em></summary><div class="g2">'+F("Name","projects."+i+".name",p.name)+F("Tag","projects."+i+".tag",p.tag)+'</div>'+F("Short description","projects."+i+".desc",p.desc)+F("GitHub or live link","projects."+i+".link",p.link)+
@@ -320,7 +355,10 @@ function panel(){
 function buildEd(){
   $("eb2").innerHTML='<div class="adm"><aside class="sb"><div class="eyebrow" style="margin:0 14px 8px">Dashboard</div>'+TABS.map(function(t){return '<button class="tab'+(t[0]===tab?" on":"")+'" data-tab="'+t[0]+'" type="button">'+t[1]+'</button>'}).join("")+'<div class="sp"></div><button class="btn sm" data-close type="button">View site</button><button class="btn sm" id="lg2" type="button">Log out</button></aside><div class="pn"><div class="row" style="justify-content:space-between"><h2>'+TABS.filter(function(t){return t[0]===tab})[0][1]+'</h2><span class="msg" id="sm">Changes save automatically.</span></div>'+panel()+'</div></div>'}
 function note(m){var e=$("sm");if(e)e.textContent=m}
-function persist(){var ok=sv(KEY,JSON.stringify(D));render();note(ok?"Saved ✓":"Storage full — use smaller images.")}
+var pt=null;
+function persist(){var ok=sv(KEY,JSON.stringify(D));render();
+  if(CLOUD&&SBS){note("Saving…");clearTimeout(pt);pt=setTimeout(function(){sbPush().then(function(){note("Saved to cloud ✓")}).catch(function(){note("Cloud save failed — sign in again")})},700);return}
+  note(ok?"Saved ✓":"Storage full — use smaller images.")}
 function path(p){var a=p.split("."),o=D;for(var i=0;i<a.length-1;i++)o=o[a[i]];return[o,a[a.length-1]]}
 function shrink(f,max,type,cb){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var s=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=im.width*s;c.height=im.height*s;c.getContext("2d").drawImage(im,0,0,c.width,c.height);cb(c.toDataURL(type,.82))};im.src=r.result};r.readAsDataURL(f)}
 var ae=$("ae");
@@ -333,26 +371,27 @@ ae.addEventListener("input",function(e){var t=e.target;
 ae.addEventListener("keydown",function(e){if(e.target.id==="ns"&&e.key==="Enter"){e.preventDefault();addSkill()}});
 ae.addEventListener("toggle",function(e){var d=e.target;if(d.dataset&&d.dataset.i!=null)OP[d.dataset.i]=d.open},true);
 ae.addEventListener("change",function(e){var t=e.target;if(!t.files||!t.files[0])return;
-  if(t.hasAttribute("data-lf")){var fr=new FileReader();fr.onload=function(){D.logoFont=fr.result;persist();buildEd()};fr.readAsDataURL(t.files[0])}else if(t.hasAttribute("data-logo"))shrink(t.files[0],160,"image/png",function(u){D.logoImg=u;persist();buildEd()});
-  else if(t.dataset.up){var ij=t.dataset.up.split(".");shrink(t.files[0],1000,"image/jpeg",function(u){D.projects[ij[0]].shots[ij[1]].img=u;persist();buildEd()})}});
+  if(t.hasAttribute("data-lf")){if(CLOUD&&SBS)up(t.files[0],"font-"+t.files[0].name,function(u){D.logoFont=u;persist();buildEd()});else{var fr=new FileReader();fr.onload=function(){D.logoFont=fr.result;persist();buildEd()};fr.readAsDataURL(t.files[0])}}else if(t.hasAttribute("data-logo"))shrink(t.files[0],160,"image/png",function(u){up(u,"logo.png",function(v){D.logoImg=v;persist();buildEd()})});
+  else if(t.dataset.up){var ij=t.dataset.up.split(".");shrink(t.files[0],1000,"image/jpeg",function(u){up(u,"shot.jpg",function(v){D.projects[ij[0]].shots[ij[1]].img=v;persist();buildEd()})})}});
 ae.addEventListener("click",function(e){var t=e.target;
-  if(t.dataset.tab){tab=t.dataset.tab;buildEd()}
+  if(t.dataset.tab){tab=t.dataset.tab;if(tab==="messages"){MSG=null;loadMsgs()}buildEd()}
   else if(t.dataset.add){var a=t.dataset.add.split("."),last=a[a.length-1],arr=D;a.forEach(function(k){arr=arr[k]});
     arr.push(last==="shots"?{img:"",cap:""}:last==="projects"?{name:"New project",tag:"Web App",desc:"",link:"",shots:[]}:{title:"",place:"",when:""});
     if(last==="projects")OP[arr.length-1]=true;persist();buildEd()}
   else if(t.dataset.rm){if(/^projects\.\d+$/.test(t.dataset.rm)&&!confirm("Delete this project?"))return;var b=t.dataset.rm.split("."),ix=+b.pop(),ar=D;b.forEach(function(k){ar=ar[k]});ar.splice(ix,1);if(b.length===1&&b[0]==="projects")OP={};persist();buildEd()}
   else if(t.dataset.mv){var q=t.dataset.mv.split("|"),c=q[0].split("."),i0=+c.pop(),ar2=D;c.forEach(function(k){ar2=ar2[k]});var i1=i0+ +q[1];if(i1<0||i1>=ar2.length)return;var tmp=ar2[i0];ar2[i0]=ar2[i1];ar2[i1]=tmp;if(c.length===1&&c[0]==="projects"){OP={};OP[i1]=true}persist();buildEd()}
+  else if(t.dataset.dm){delMsg(t.dataset.dm)}
   else if(t.id==="as")addSkill();
   else if(t.id==="ar"){D.acc="";persist();buildEd()}
   else if(t.id==="rf"){D.logoFont="";persist();buildEd()}else if(t.id==="rl"){D.logoImg="";persist();buildEd()}
   else if(t.id==="rs"){if(confirm("Discard local edits and use the published data?")){D=JSON.parse(JSON.stringify(BASE));try{localStorage.removeItem(KEY)}catch(x){}render();buildEd()}}
-  else if(t.id==="lg2"){authed=false;closeAd()}
-  else if(t.id==="cp"){var v=$("np").value;if(v.length<6){note("Use at least 6 characters.");return}sha(v).then(function(h){sv(PK,h);$("np").value="";note("Password changed ✓")})}
+  else if(t.id==="lg2"){authed=false;SBS=null;sbSaveSess();closeAd()}
+  else if(t.id==="cp"){if(CLOUD){note("Change your password in Supabase → Authentication → Users.");return}var v=$("np").value;if(v.length<6){note("Use at least 6 characters.");return}sha(v).then(function(h){sv(PK,h);$("np").value="";note("Password changed ✓")})}
   else if(t.id==="ex2"){var bl=new Blob([JSON.stringify(D)],{type:"application/json"}),l=document.createElement("a");l.href=URL.createObjectURL(bl);l.download="data.json";l.click()}
   else if(t.id==="im"){var inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.onchange=function(){var r=new FileReader();r.onload=function(){try{D=Object.assign({},DEF,JSON.parse(r.result));persist();buildEd()}catch(x){note("Invalid file.")}};r.readAsText(inp.files[0])};inp.click()}});
 var BASE=JSON.parse(JSON.stringify(DEF));
 render();route();
-try{fetch("data.json",{cache:"no-cache"}).then(function(r){return r.ok?r.json():null}).then(function(j){if(!j||typeof j!=="object")return;BASE=Object.assign({},DEF,j);var s={};try{s=JSON.parse(ld(KEY)||"{}")}catch(e){}D=Object.assign({},BASE,s);if(!ld(SK))document.documentElement.setAttribute("data-theme",D.theme||"dark");render()}).catch(function(){})}catch(e){}
+try{fetch("data.json",{cache:"no-cache"}).then(function(r){return r.ok?r.json():null}).then(function(j){if(!j||typeof j!=="object")return;BASE=Object.assign({},DEF,j);var s={};try{s=JSON.parse(ld(KEY)||"{}")}catch(e){}D=Object.assign({},BASE,s);if(!ld(SK))document.documentElement.setAttribute("data-theme",D.theme||"dark");render()}).catch(function(){}).then(loadRemote)}catch(e){loadRemote()}
 </script>
 </body>
 </html>

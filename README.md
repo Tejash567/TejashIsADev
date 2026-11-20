@@ -1,24 +1,27 @@
 # TejashIsADev
 
-Personal developer portfolio. Plain HTML, CSS and JavaScript in one file. No build step, no database.
+Personal developer portfolio. One HTML file, no build step. Content, screenshots and messages live in Supabase.
 
-## Publish (GitHub Pages)
-1. Push these files to the `main` branch.
-2. Repo **Settings → Pages → Deploy from a branch → main / (root)**.
-3. Your site goes live at `https://tejash567.github.io/TejashIsADev/`.
+## 1. Set up Supabase (once)
+1. Supabase dashboard → **SQL Editor** → paste `supabase.sql`. Replace `OWNER_EMAIL` with your email, then Run.
+2. **Authentication → Users → Add user** → your email + a strong password (tick auto-confirm).
+3. **Authentication → Sign In / Providers → Email** → turn **off** "Allow new users to sign up".
+4. (Optional) Authentication → URL Configuration: set Site URL to your published address.
 
-## Edit your content
-1. Open the site and add `#admin` to the address. Default password: `admin123`. Change it first.
-2. Edit anything. Changes save in your browser only.
-3. To publish for everyone: **Backup → Export data.json**, replace `data.json` in this repo, commit and push.
-4. If you later see old content while logged in, use **Backup → Discard local edits**.
+The URL and publishable key in `index.html` are meant to be public. Row Level Security (from the SQL) decides who can write, and only your email can.
 
-## Receive messages from the contact form
-Without setup, the form opens the visitor's email app. To get messages straight to your inbox:
-- **Web3Forms** (easiest): get a free access key at web3forms.com, paste the key into admin → Profile → *Contact form endpoint*.
-- **Formspree**: create a form at formspree.io, paste its URL (`https://formspree.io/f/...`) into the same field.
-Then export `data.json` and push.
+## 2. Publish (GitHub Pages)
+Push files to `main`, then Settings → Pages → Deploy from a branch → main / root.
 
-## Notes
-- The admin login runs in the browser and is for convenience only. Never store secrets in `data.json`.
-- Contact email shown on the site is public. Use a dedicated address.
+## 3. Edit your site
+Open your site with `#admin` on the end, sign in with the Supabase email and password. Edits save to the cloud and go live for everyone. The first edit you make seeds the database. Uploads go to the `portfolio` storage bucket.
+Messages from the contact form appear under **Messages**.
+
+## 4. Email delivery (optional, Web3Forms)
+Get a key at web3forms.com, paste it into admin → Profile → *Contact form endpoint*. Messages are then saved in Supabase and emailed to you.
+
+## Fallbacks
+`data.json` is used if Supabase is unreachable. Backup → Export data.json writes it.
+
+## Live sync
+Open pages check for changes every ~3 seconds, so admin edits appear for all visitors without a refresh.
