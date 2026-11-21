@@ -31,8 +31,15 @@ Admin → Projects → **Load my repos**, tick the ones to show, **Add / update 
 For screenshots, add a `screenshots` folder to each repo and name files like `1-Timed quiz mode.png`. The number sets the order, the text becomes the caption. Run **Sync all linked projects** after pushing new screenshots. The site also checks GitHub for new screenshots when it loads (switch off in Look).
 
 ## SEO checklist
-1. Search Console: https://search.google.com/search-console → add property **URL prefix** `https://tejash.is-a.dev/`. Verify with the HTML file method: download the file Google gives you and put it in the repo root, push, then click Verify.
-2. Sitemaps → submit `sitemap.xml`. Then URL Inspection → paste the home URL → Request indexing.
-3. Add the site link everywhere you already exist: GitHub profile website field, each repo's website field, LinkedIn, resume. Backlinks are what make a personal name rank.
-4. Check previews: share the link in WhatsApp/LinkedIn, or use the LinkedIn Post Inspector. Check structured data with Google's Rich Results Test.
-5. Keep **Site URL** in admin → Profile correct if the domain ever changes.
+Already built in: title, description, canonical, Open Graph and Twitter cards, Person / ProfilePage / WebSite / ItemList structured data (no email or phone), favicon set, web manifest, robots.txt, sitemap.xml with image, 404 page, crawler-readable fallback content, fast non-blocking fonts.
+
+You still need to do (this is what actually moves rankings):
+1. **Search Console** (search.google.com/search-console): add a **URL prefix** property `https://tejash.is-a.dev/`. Pick the **HTML tag** method and send me the `<meta>` code, or the **HTML file** method (put the file in the repo root). The meta tag from the `google-site-verification=` DNS value is already in index.html in case Google accepts it.
+2. Sitemaps → submit `sitemap.xml`. URL Inspection → Request indexing.
+3. Bing Webmaster Tools → Import from Google Search Console.
+4. Link to the site from your GitHub profile (Website field and profile README), every repo's Website field, LinkedIn, resume, WhatsApp/Instagram bio.
+5. Optional but good: admin → Backup → **Download index.html with current content**, upload it. It bakes your content into the page for instant first load and for crawlers that don't run JavaScript.
+6. Keep real content: replace the placeholder education and experience, add screenshots to each project.
+
+## Instant updates
+Run `supabase.sql` once more (the last block turns on Realtime for the site table). Edits then reach open pages in well under a second.
